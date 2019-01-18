@@ -32,6 +32,7 @@ import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexRes
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
+import org.springframework.data.mongodb.util.JustOnceLogger;
 import org.springframework.data.mongodb.util.MongoDbErrorCodes;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
@@ -50,7 +51,9 @@ import com.mongodb.MongoException;
  * @author Laurent Canet
  * @author Christoph Strobl
  * @author Mark Paluch
+ * @deprecated since 2.2. Please use {@link IndexResolver} and {@link IndexOperations}.
  */
+@Deprecated
 public class MongoPersistentEntityIndexCreator implements ApplicationListener<MappingContextEvent<?, ?>> {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(MongoPersistentEntityIndexCreator.class);
@@ -110,6 +113,7 @@ public class MongoPersistentEntityIndexCreator implements ApplicationListener<Ma
 
 		// Double check type as Spring infrastructure does not consider nested generics
 		if (entity instanceof MongoPersistentEntity) {
+
 			checkForIndexes((MongoPersistentEntity<?>) entity);
 		}
 	}
@@ -133,8 +137,16 @@ public class MongoPersistentEntityIndexCreator implements ApplicationListener<Ma
 	private void checkForAndCreateIndexes(MongoPersistentEntity<?> entity) {
 
 		if (entity.isAnnotationPresent(Document.class)) {
-			for (IndexDefinitionHolder indexToCreate : indexResolver.resolveIndexFor(entity.getTypeInformation())) {
+			for (IndexDefinition indexDefinition : indexResolver.resolveIndexFor(entity.getTypeInformation())) {
+
+				JustOnceLogger.logWarnIndexCreationDeprecated(this.getClass());
+
+				IndexDefinitionHolder indexToCreate = indexDefinition instanceof IndexDefinitionHolder
+						? (IndexDefinitionHolder) indexDefinition
+						: new IndexDefinitionHolder("", indexDefinition, entity.getCollection());
+
 				createIndex(indexToCreate);
+
 			}
 		}
 	}

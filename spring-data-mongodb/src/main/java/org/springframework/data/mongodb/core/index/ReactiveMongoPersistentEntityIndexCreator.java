@@ -32,6 +32,7 @@ import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexRes
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
+import org.springframework.data.mongodb.util.JustOnceLogger;
 import org.springframework.data.mongodb.util.MongoDbErrorCodes;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
@@ -44,7 +45,9 @@ import com.mongodb.MongoException;
  *
  * @author Mark Paluch
  * @since 2.1
+ * @deprecated since 2.2. Please use {@link IndexResolver} and {@link IndexOperations}.
  */
+@Deprecated
 public class ReactiveMongoPersistentEntityIndexCreator {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(ReactiveMongoPersistentEntityIndexCreator.class);
@@ -125,7 +128,12 @@ public class ReactiveMongoPersistentEntityIndexCreator {
 		List<Mono<?>> publishers = new ArrayList<>();
 
 		if (entity.isAnnotationPresent(Document.class)) {
-			for (IndexDefinitionHolder indexToCreate : indexResolver.resolveIndexFor(entity.getTypeInformation())) {
+			for (IndexDefinition indexDefinition : indexResolver.resolveIndexFor(entity.getTypeInformation())) {
+
+				IndexDefinitionHolder indexToCreate = indexDefinition instanceof IndexDefinitionHolder
+						? (IndexDefinitionHolder) indexDefinition
+						: new IndexDefinitionHolder("", indexDefinition, entity.getCollection());
+
 				publishers.add(createIndex(indexToCreate));
 			}
 		}
@@ -134,6 +142,8 @@ public class ReactiveMongoPersistentEntityIndexCreator {
 	}
 
 	Mono<String> createIndex(IndexDefinitionHolder indexDefinition) {
+
+		JustOnceLogger.logWarnIndexCreationDeprecated(this.getClass());
 
 		return operationsProvider.indexOps(indexDefinition.getCollection()).ensureIndex(indexDefinition) //
 				.onErrorResume(ReactiveMongoPersistentEntityIndexCreator::isDataIntegrityViolation,
